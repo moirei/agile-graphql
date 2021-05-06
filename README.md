@@ -11,12 +11,6 @@ A GraphQL client wrapper for the frontend. This is package provides a Prisma.js 
 
 
 
-**Heading**
-
-* Using in Vue
-
-
-
 
 ## Installation
 
@@ -149,6 +143,51 @@ computed: {
     }),
   },
 ...
+```
+
+
+
+## Methods
+
+| Name                                                 | Type       | Description                             |
+| ---------------------------------------------------- | ---------- | --------------------------------------- |
+| `findUnique(where, fields, options)`                 | `query`    | Get a unique model data                 |
+| `findOne(where, fields, options)`                    | `query`    | Get first matched model data            |
+| `findMany(fields, options)`                          | `query`    | Get all data for model                  |
+| `create(data, fields, options)`                      | `mutation` | Create a data entry for model           |
+| `update(where, data, fields, options)`               | `mutation` | Update a data entry for model           |
+| `upsert(where, { create, update }, fields, options)` | `mutation` | Update or create a data entry for model |
+| `updateMany(where, data, fields, options)`           | `mutation` | Update many data entries for model      |
+| `delete(where, fields, options)`                     | `mutation` | Delete a data entry                     |
+| `deleteMany(where, fields, options)`                 | `mutation` | Delete many matching data entry         |
+
+The above queries/mutations are called dynamically when using this package. They must be implemented server-side.
+
+
+
+## Custom methods and overrides
+
+```javascript
+import { Graph as Base } from '@moirei/agile-graphql'
+
+class Graph extends Base{
+    // override `findUnique` for `users`
+    async usersFindUnique(where){
+        ...
+        return user
+    }
+    
+    // add new methods
+    async usersAdmins(where){
+        ...
+        return admins
+    }
+}
+
+...
+const graph = new Graph(apollo)
+
+const active_admins = await graph.users.admins({ activated: true })
 ```
 
 

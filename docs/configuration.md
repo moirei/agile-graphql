@@ -1,13 +1,13 @@
 # Configuration
 
-```json
+```javascript
 {
     proxy: false, // if false, undefined crud methods will not resolve
     defaults: {
         keyField: 'id', // default model key field
         query: {
             findUnique: ['id', 'name'],
-            // accepts: `findUnique`, findOne`, `findMany`, `create`, `update`
+            // accepts: `findUnique`, `findOne`, `findMany`, `create`, `update`
             // `upsert`, `updateMany`, `delete`, `deleteMany`
         },
     },
