@@ -1,0 +1,35 @@
+{
+  "name": "@moirei/agile-graphql",
+  "version": "0.1.0",
+  "description": "Query your graph Prisma.js style with ease.",
+  "private": false,
+  "main": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moirei/agile-graphql.git"
+  },
+  "keywords": [
+    "vue",
+    "graphql",
+    "query",
+    "mappers",
+    "prisma.js",
+    "prisma",
+    "crud",
+    "proxy"
+  ],
+  "author": "Augustus Okoye <augustusokoye@moirei.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/moirei/agile-graphql/issues"
+  },
+  "homepage": "https://github.com/moirei/agile-graphql#readme",
+  "dependencies": {
+    "graphql-tag": "^2.12.4",
+    "lodash": "^4.17.21",
+    "pluralize": "^8.0.0"
+  }
+}
