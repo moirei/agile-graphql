@@ -1,6 +1,6 @@
 # agile-graphql
 
-A GraphQL client wrapper for the frontend. This is package provides a Prisma.js schema delegation style for easier and more intuitive queries.
+A GraphQL client wrapper for the frontend. This package provides a fluent query builder and a Prisma.js schema delegation style CRUD for a more intuitive queries.
 
 
 
@@ -93,7 +93,7 @@ const user = await graph.query.user(['id', 'name'], {
     },
 })
 
-const users = await graph.query.users('name reviews{ rating }) // get only name field
+const users = await graph.query.users('id name reviews{ rating }')
 ```
 
 Example mutation
