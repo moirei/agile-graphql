@@ -1,6 +1,7 @@
 import gql from "graphql-tag";
 import { get, upperFirst, isEmpty } from "lodash";
 import { singular, plural } from "pluralize";
+import { builderHandler } from "./handlers";
 
 const defaultConfig = {
   proxy: true,
@@ -20,6 +21,7 @@ export default class Graph {
     this.apollo = apollo;
     this.defaults = defaults;
     this.crud = crud;
+    this.$raw = false;
 
     if (overrides) {
       this.override(overrides);
@@ -113,15 +115,45 @@ export default class Graph {
   $proxy() {
     const instance = this;
     const handler = {
-      get(_, model) {
-        return instance.$methods(model);
+      get(_, o) {
+        if (instance[o]) {
+          return instance[o];
+        }
+
+        return instance.$methods(o);
       },
     };
 
     return new Proxy(this, handler);
   }
 
-  async query({
+  get raw() {
+    this.$raw = true;
+    return this;
+  }
+
+  get query() {
+    return new Proxy(
+      { type: "query", apollo: this.apollo, raw: this.$raw },
+      builderHandler
+    );
+  }
+
+  get mutation() {
+    return new Proxy(
+      { type: "mutation", apollo: this.apollo, raw: this.$raw },
+      builderHandler
+    );
+  }
+
+  get subscription() {
+    return new Proxy(
+      { type: "subscription", apollo: this.apollo, raw: this.$raw },
+      builderHandler
+    );
+  }
+
+  async $query({
     type = "query",
     name,
     action,
@@ -170,7 +202,7 @@ export default class Graph {
   get $queries() {
     return {
       count: (model, { keyField, fetchPolicy }) => async () => {
-        const results = await this.query({
+        const results = await this.$query({
           action: plural(model),
           query: keyField,
           fetchPolicy,
@@ -183,7 +215,7 @@ export default class Graph {
         { name, fetchPolicy: fp } = {}
       ) => {
         const action = singular(model);
-        return this.query({
+        return this.$query({
           name,
           action,
           query: this.resolveQuery(model, "findUnique", query),
@@ -202,22 +234,22 @@ export default class Graph {
         query,
         { name, fetchPolicy: fp } = {}
       ) => {
-        return this.query({
+        return this.$query({
           name,
           action: plural(model),
           query: this.resolveQuery(model, "findMany", query),
           fetchPolicy: fp || fetchPolicy,
         });
       },
-      findOne: (model, { fetchPolicy }) => (
+      findFirst: (model, { fetchPolicy }) => (
         where,
         query,
         { name, fetchPolicy: fp } = {}
       ) => {
-        return this.query({
+        return this.$query({
           name,
-          action: `${plural(model)}FindOne`,
-          query: this.resolveQuery(model, "findOne", query),
+          action: `${plural(model)}findFirst`,
+          query: this.resolveQuery(model, "findFirst", query),
           fetchPolicy: fp || fetchPolicy,
           variables: [
             {
@@ -240,7 +272,7 @@ export default class Graph {
         { name, fetchPolicy: fp } = {}
       ) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           name,
           action: `createOne${singular(x)}`,
@@ -263,7 +295,7 @@ export default class Graph {
         { name, fetchPolicy: fp } = {}
       ) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           name,
           action: `updateOne${singular(x)}`,
@@ -292,7 +324,7 @@ export default class Graph {
         { name, fetchPolicy: fp } = {}
       ) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           name,
           action: `upsertOne${singular(x)}`,
@@ -325,7 +357,7 @@ export default class Graph {
         { name, fetchPolicy: fp } = {}
       ) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           name,
           action: `updateMany${singular(x)}`,
@@ -349,7 +381,7 @@ export default class Graph {
       },
       delete: (model, { fetchPolicy }) => (where, query) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           action: `deleteOne${singular(x)}`,
           query: this.resolveQuery(model, "delete", query),
@@ -366,7 +398,7 @@ export default class Graph {
       },
       deleteMany: (model, { fetchPolicy }) => (where, query) => {
         const x = upperFirst(model);
-        return this.query({
+        return this.$query({
           type: "mutation",
           action: `deleteMany${singular(x)}`,
           query: this.resolveQuery(model, "deleteMany", query),

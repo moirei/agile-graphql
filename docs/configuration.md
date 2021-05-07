@@ -7,7 +7,7 @@
         keyField: 'id', // default model key field
         query: {
             findUnique: ['id', 'name'],
-            // accepts: `findUnique`, `findOne`, `findMany`, `create`, `update`
+            // accepts: `findUnique`, `findFirst`, `findMany`, `create`, `update`
             // `upsert`, `updateMany`, `delete`, `deleteMany`
         },
     },
@@ -19,7 +19,7 @@
                 findUnique: 'standby',
             },
             methods: {
-                except: ['findOne'], // allow all methods for `users` except `findOne`
+                except: ['findFirst'], // allow all methods for `users` except `findFirst`
                 only: ['findUnique', 'findMany'], // allow `findUnique` and `findMany` methods for `users`
             }
         },

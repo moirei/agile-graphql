@@ -1,9 +1,13 @@
 {
   "name": "@moirei/agile-graphql",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Query your graph Prisma.js style with ease.",
   "private": false,
   "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./mappers": "./src/mappers.js"
+  },
   "files": [
     "src"
   ],
@@ -28,6 +32,7 @@
   },
   "homepage": "https://github.com/moirei/agile-graphql#readme",
   "dependencies": {
+    "gql-query-builder": "^3.5.5",
     "graphql-tag": "^2.12.4",
     "lodash": "^4.17.21",
     "pluralize": "^8.0.0"
