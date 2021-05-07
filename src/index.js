@@ -1,4 +1,5 @@
 export * from "./graph";
+export * from "./mappers";
 import Graph from "./graph";
 
 const VuePlugin = {

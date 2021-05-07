@@ -100,7 +100,7 @@ Example mutation
 
 ```javascript
 const data = { name: 'James Bomd' }
-const user = await graph.query.createOneUser(
+const user = await graph.mutation.createOneUser(
   ['id', 'name'],
   {
     data: {
@@ -263,7 +263,7 @@ Vue.use(VuePlugin, config)
 First install the Plugin.
 
 ```javascript
-import { mapQueries } from '@moirei/agile-graphql/mappers'
+import { mapQueries } from '@moirei/agile-graphql'
 
 ...
 data: () => ({
