@@ -1,15 +1,18 @@
+// @ts-ignore
 import Vue from "vue";
 import { get } from "lodash";
+import { Mappers } from "./types";
 
-export function mapQueries(input) {
-  const mapped = {};
-  let queries = {};
+export function mapQueries(input: Mappers.QueryMapperInput) {
+  const mapped: Record<string, any> = {};
+  let queries: Record<string, any> = {};
 
   if (typeof input === "string") {
     const { field, data } = fromString(input);
     queries[field] = data;
   } else if (typeof input === "object") {
     for (const field in input) {
+      // @ts-ignore
       const i = input[field];
       if (typeof i === "string") {
         const { data } = fromString(i);
@@ -20,6 +23,7 @@ export function mapQueries(input) {
       }
     }
   } else if (Array.isArray(input)) {
+    // @ts-ignore
     input.forEach((input) => {
       // must be string
       const { field, data } = fromString(input);
@@ -27,7 +31,10 @@ export function mapQueries(input) {
     });
   }
 
-  const o = { loading: {} };
+  const o: {
+    [field: string]: any;
+    loading: Record<string, boolean>;
+  } = { loading: {} };
   for (const field in queries) {
     const data = queries[field];
     o[field] = data.default || null;
@@ -56,7 +63,7 @@ export function mapQueries(input) {
   return mapped;
 }
 
-function fromString(str) {
+function fromString(str: string) {
   const pos = str.indexOf(".");
   const field = pos >= 0 ? str.substring(pos + 1) : str;
   const namespace = pos >= 0 ? str.substr(0, pos) : str;
@@ -70,9 +77,9 @@ function fromString(str) {
   };
 }
 
-const getArgs = (context, data) => {
-  let args = [];
-  const x = get(data, "params");
+const getArgs = (context: Record<string, unknown>, data: any) => {
+  let args: any[] = [];
+  const x: string | string[] = get(data, "params");
   if (x) {
     if (typeof x === "string") {
       args.push(context[x]);
@@ -83,7 +90,11 @@ const getArgs = (context, data) => {
   return args;
 };
 
-const call = async (f, context, args) => {
+const call = async (
+  f: Function,
+  context: Record<string, unknown>,
+  args: any[]
+) => {
   if (!f) return null;
   const callable = await Promise.resolve(f);
   return callable.apply(context, args);

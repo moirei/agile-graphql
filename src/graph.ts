@@ -1,7 +1,19 @@
+import Fields from "gql-query-builder/build/Fields";
 import gql from "graphql-tag";
+import * as builder from "gql-query-builder";
 import { get, upperFirst, isEmpty } from "lodash";
 import { singular, plural } from "pluralize";
 import { builderHandler } from "./handlers";
+import {
+  GraphConfig,
+  GraphConfigDefaults,
+  GraphConfigCrud,
+  QueryInput,
+  QueryOptions,
+  CrudMethodBuilderOption,
+  Apollo,
+  QueryType,
+} from "./types";
 
 const defaultConfig = {
   proxy: true,
@@ -12,7 +24,12 @@ const defaultConfig = {
 };
 
 export default class Graph {
-  constructor(apollo, config = {}) {
+  private apollo: Apollo;
+  private crud: GraphConfigCrud | undefined;
+  private defaults: GraphConfigDefaults;
+  private $raw: boolean;
+
+  constructor(apollo: Apollo, config: GraphConfig = {}) {
     config.defaults = { ...defaultConfig.defaults, ...(config.defaults || {}) };
     const { proxy, defaults, crud, overrides } = {
       ...defaultConfig,
@@ -36,7 +53,13 @@ export default class Graph {
     }
   }
 
-  init(crud) {
+  /**
+   * Initialise the graph instance with crud operations
+   * Bypasses Proxy for speed
+   *
+   * @param {GraphConfigCrud} crud configuration
+   */
+  init(crud: GraphConfigCrud) {
     const instance = this;
     for (const model in crud) {
       Object.defineProperty(instance, model, {
@@ -47,7 +70,12 @@ export default class Graph {
     }
   }
 
-  override(overrides) {
+  /**
+   * Specify crud methods overrides
+   *
+   * @param {Record<string, Function>} overrides
+   */
+  override(overrides: Record<string, Function>) {
     for (const method in overrides) {
       Object.defineProperty(this, method, {
         get() {
@@ -57,8 +85,14 @@ export default class Graph {
     }
   }
 
-  $methods(model) {
-    const m = {};
+  /**
+   * Get all crud methods for a model. E.g. `users`
+   *
+   * @param {string} model the name of the model
+   * @returns
+   */
+  private $methods(model: string) {
+    const m: Record<string, Function> = {};
 
     const queries = this.$queries;
     const mutations = this.$mutations;
@@ -93,9 +127,12 @@ export default class Graph {
           : get(fetchPolicy, method, this.defaults.fetchPolicy);
 
       const override = `${plural(model)}${upperFirst(method)}`;
+      // @ts-ignore
       m[method] = this[override]
-        ? this[override]
-        : queries[method](model, { keyField, fetchPolicy: fp });
+        ? // @ts-ignore
+          this[override]
+        : // @ts-ignore
+          queries[method](model, { keyField, fetchPolicy: fp });
     }
     for (const method of allowed_mutation_methods) {
       const fp =
@@ -104,19 +141,29 @@ export default class Graph {
           : get(fetchPolicy, method, this.defaults.fetchPolicy);
 
       const override = `${singular(model)}${upperFirst(method)}`;
+      // @ts-ignore
       m[method] = this[override]
-        ? this[override]
-        : mutations[method](model, { keyField, fetchPolicy: fp });
+        ? // @ts-ignore
+          this[override]
+        : // @ts-ignore
+          mutations[method](model, { keyField, fetchPolicy: fp });
     }
 
     return m;
   }
 
-  $proxy() {
-    const instance = this;
+  /**
+   * Initialise proxy
+   *
+   * @returns {Proxy}
+   */
+  private $proxy() {
+    const instance: Graph = this;
     const handler = {
-      get(_, o) {
+      get(_: any, o: string) {
+        // @ts-ignore
         if (instance[o]) {
+          // @ts-ignore
           return instance[o];
         }
 
@@ -153,46 +200,36 @@ export default class Graph {
     );
   }
 
-  async $query({
+  private async $query({
     type = "query",
     name,
-    action,
-    query = "",
-    variables: vars = [],
+    operation,
+    query: fields = [],
+    variables = {},
     fetchPolicy,
-  }) {
-    let p1 = "";
-    let p2 = "";
-    const variables = {};
+  }: QueryInput) {
+    if (!Array.isArray(fields)) fields = [fields];
 
-    vars.forEach((variable) => {
-      p1 += `$${variable.name}: ${variable.type}${
-        variable.required ? "!" : ""
-      },`;
-      p2 += `${variable.name}: $${variable.name},`;
+    const query = builder[type](
+      {
+        operation,
+        fields: fields as Fields,
+        variables: variables || {},
+      },
+      null,
+      name ? { operationName: name } : undefined
+    );
 
-      variables[variable.name] = variable.value;
-    });
+    let a: "query" | "mutate" | "subscribe";
+    if (type === "mutation") a = "mutate";
+    else if (type === "subscription") a = "subscribe";
+    else a = type;
 
-    const is_array = Array.isArray(query);
-    const has_query =
-      (typeof query === "string" && query) || (is_array && query.length);
-
-    if (is_array) {
-      query = query.join(",");
-    }
-
-    p1 = p1.replace(/(^,)|(,$)/g, "");
-    p2 = p2.replace(/(^,)|(,$)/g, "");
-
-    const { data } = await this.apollo[type === "mutation" ? "mutate" : type]({
+    const { data } = await this.apollo[a]({
       [type]: gql`
-        ${type} ${name ? name : ""} ${p1 ? "(" + p1 + ")" : ""} {
-          ${action}${p2 ? "(" + p2 + ")" : ""}
-          ${has_query ? "{" + query + "}" : ""}
-        }
+        ${query.query}
       `,
-      variables,
+      variables: query.variables,
       fetchPolicy,
     });
 
@@ -201,64 +238,67 @@ export default class Graph {
 
   get $queries() {
     return {
-      count: (model, { keyField, fetchPolicy }) => async () => {
+      count: (
+        model: string,
+        { keyField, fetchPolicy }: CrudMethodBuilderOption
+      ) => async () => {
         const results = await this.$query({
-          action: plural(model),
+          operation: plural(model),
           query: keyField,
           fetchPolicy,
         });
+
+        // @ts-ignore
         return results.length;
       },
-      findUnique: (model, { fetchPolicy }) => (
-        where,
-        query,
-        { name, fetchPolicy: fp } = {}
+      findUnique: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
-        const action = singular(model);
+        const operation = singular(model);
         return this.$query({
           name,
-          action,
+          operation,
           query: this.resolveQuery(model, "findUnique", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "where",
-              type: `${upperFirst(action)}WhereUniqueInput`,
+          variables: {
+            where: {
+              type: `${upperFirst(operation)}WhereUniqueInput`,
               required: true,
               value: where,
             },
-          ],
+          },
         });
       },
-      findMany: (model, { fetchPolicy }) => (
-        query,
-        { name, fetchPolicy: fp } = {}
+      findMany: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         return this.$query({
           name,
-          action: plural(model),
+          operation: plural(model),
           query: this.resolveQuery(model, "findMany", query),
           fetchPolicy: fp || fetchPolicy,
         });
       },
-      findFirst: (model, { fetchPolicy }) => (
-        where,
-        query,
-        { name, fetchPolicy: fp } = {}
+      findFirst: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         return this.$query({
           name,
-          action: `${plural(model)}findFirst`,
+          operation: `${plural(model)}findFirst`,
           query: this.resolveQuery(model, "findFirst", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${upperFirst(singular(model))}WhereInput`,
               required: true,
               value: where,
             },
-          ],
+          },
         });
       },
     };
@@ -266,165 +306,167 @@ export default class Graph {
 
   get $mutations() {
     return {
-      create: (model, { fetchPolicy }) => (
-        data,
-        query,
-        { name, fetchPolicy: fp } = {}
+      create: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        data: any,
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
           name,
-          action: `createOne${singular(x)}`,
+          operation: `createOne${singular(x)}`,
           query: this.resolveQuery(model, "create", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "data",
+          variables: {
+            data: {
               type: `${x}CreateInput`,
               required: true,
               value: data,
             },
-          ],
+          },
         });
       },
-      update: (model, { fetchPolicy }) => (
-        where,
-        data,
-        query,
-        { name, fetchPolicy: fp } = {}
+      update: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        data: any,
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
           name,
-          action: `updateOne${singular(x)}`,
+          operation: `updateOne${singular(x)}`,
           query: this.resolveQuery(model, "update", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${x}WhereUniqueInput`,
               required: true,
               value: where,
             },
-            {
-              name: "data",
+            data: {
               type: `${x}UpdateInput`,
               required: true,
               value: data,
             },
-          ],
+          },
         });
       },
-      upsert: (model, { fetchPolicy }) => (
-        where,
-        { create, update },
-        query,
-        { name, fetchPolicy: fp } = {}
+      upsert: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        { create, update }: { create: any; update: any },
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
           name,
-          action: `upsertOne${singular(x)}`,
+          operation: `upsertOne${singular(x)}`,
           query: this.resolveQuery(model, "upsert", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${x}WhereUniqueInput`,
               required: true,
               value: where,
             },
-            {
-              name: "create",
+            create: {
               type: `${x}CreateInput`,
               value: create,
             },
-            {
-              name: "update",
+            update: {
               type: `${x}UpdateInput`,
               value: update,
             },
-          ],
+          },
         });
       },
-      updateMany: (model, { fetchPolicy }) => (
-        where,
-        data,
-        query,
-        { name, fetchPolicy: fp } = {}
+      updateMany: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        data: any,
+        query: string | string[],
+        { name, fetchPolicy: fp }: QueryOptions = {}
       ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
           name,
-          action: `updateMany${singular(x)}`,
+          operation: `updateMany${singular(x)}`,
           query: this.resolveQuery(model, "updateMany", query),
           fetchPolicy: fp || fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${x}WhereInput`,
               required: true,
               value: where,
             },
-            {
-              name: "data",
+            data: {
               type: `${x}UpdateInput`,
               required: true,
               value: data,
             },
-          ],
+          },
         });
       },
-      delete: (model, { fetchPolicy }) => (where, query) => {
+      delete: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        query: string | string[]
+      ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
-          action: `deleteOne${singular(x)}`,
+          operation: `deleteOne${singular(x)}`,
           query: this.resolveQuery(model, "delete", query),
           fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${x}WhereUniqueInput`,
               required: true,
               value: where,
             },
-          ],
+          },
         });
       },
-      deleteMany: (model, { fetchPolicy }) => (where, query) => {
+      deleteMany: (model: string, { fetchPolicy }: CrudMethodBuilderOption) => (
+        where: any,
+        query: string | string[]
+      ) => {
         const x = upperFirst(model);
         return this.$query({
           type: "mutation",
-          action: `deleteMany${singular(x)}`,
+          operation: `deleteMany${singular(x)}`,
           query: this.resolveQuery(model, "deleteMany", query),
           fetchPolicy,
-          variables: [
-            {
-              name: "where",
+          variables: {
+            where: {
               type: `${x}WhereInput`,
               required: true,
               value: where,
             },
-          ],
+          },
         });
       },
     };
   }
 
-  resolveQuery(model, method, query = null) {
+  resolveQuery(
+    model: string,
+    method: string,
+    query?: string | string[]
+  ): undefined | string | string[] {
     if (!isEmpty(query)) return query;
 
     query = get(this.defaults, `query.${method}`);
 
     if (isEmpty(query)) {
+      // @ts-ignore
       query = get(this.crud, `${model}.query`);
     }
     if (isEmpty(query)) {
+      // @ts-ignore
       query = get(this.crud, `${model}.keyField`, this.defaults.keyField);
     }
 
