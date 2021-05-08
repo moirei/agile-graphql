@@ -260,7 +260,7 @@ Vue.use(VuePlugin, config)
 
 ### Use Query Mapper (Vue)
 
-First install the Plugin.
+First install [Vue Apollo](https://apollo.vuejs.org/) and the Plugin.
 
 ```javascript
 import { mapQueries } from '@moirei/agile-graphql'

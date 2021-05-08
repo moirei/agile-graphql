@@ -1,9 +1,10 @@
 {
   "name": "@moirei/agile-graphql",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Fluently query your graph with ease.",
   "private": false,
   "main": "./src/index.js",
+  "type": "module",
   "exports": {
     ".": "./src/index.js",
     "./mappers": "./src/mappers.js"
