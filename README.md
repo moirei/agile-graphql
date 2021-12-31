@@ -2,6 +2,7 @@
 
 A GraphQL client wrapper for the frontend. This package provides a fluent query builder and a Prisma.js schema delegation style CRUD for a more intuitive queries.
 
+This package inspired [Dobby](https://github.com/moirei/dobby) - A GraphQL Model/OpenCRUD query client.
 
 
 ## :green_heart: Features
